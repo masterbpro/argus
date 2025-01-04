@@ -1,0 +1,26 @@
+scrape_configs:
+  - job_name: 'node'
+    scrape_interval: 3s
+    static_configs:
+      - targets:
+          - '159.69.16.47:9100'
+    relabel_configs:
+      - source_labels: [ __address__ ]
+        target_label: instance
+        regex: '(.+):\d+'
+        replacement: '${1}'
+
+  - job_name: 'ping'
+    metrics_path: /probe
+    params:
+      module: [ icmp ]
+    static_configs:
+      - targets:
+          - '159.69.16.47'
+    relabel_configs:
+      - source_labels: [ __address__ ]
+        target_label: __param_target
+      - source_labels: [ __param_target ]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115

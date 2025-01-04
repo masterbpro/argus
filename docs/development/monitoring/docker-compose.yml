@@ -1,0 +1,42 @@
+services:
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    restart: always
+    volumes:
+      - ./data/grafana/var:/var/lib/grafana
+      - ./data/grafana/provisioning/:/etc/grafana/provisioning/
+    environment:
+      TZ: "Europe/Moscow"
+    user: "0"
+    ports:
+      - "3000:3000"
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    restart: always
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./data/prometheus:/etc/prometheus/
+    environment:
+      TZ: "Europe/Moscow"
+    ports:
+      - "9090:9090"
+
+  blackbox:
+    image: prom/blackbox-exporter
+    container_name: blackbox
+    hostname: blackbox
+    restart: always
+    command:
+      - "--config.file=/etc/blackbox/blackbox.yml"
+    volumes:
+      - ./data/blackbox:/etc/blackbox
+    environment:
+      TZ: "Europe/Moscow"
+    sysctls:
+      net.ipv4.ping_group_range: "0 2147483647"
+    ports:
+      - "9115:9115"

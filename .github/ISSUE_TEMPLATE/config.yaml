@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📃 Documentation
+    url: https://github.com/masterbpro/argus/wiki
+    about: Please read the documentation from here.
