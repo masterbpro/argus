@@ -1,0 +1,23 @@
+network:
+  interfaces:
+    - name: eth0
+      rules:
+        - action: allow
+          protocol: tcp
+          src_ip: 0.0.0.0/0
+          dst_port: 22
+          comment: "Allow SSH"
+        - action: allow
+          protocol: icmp
+          src_ip: 0.0.0.0/0
+          comment: "Allow ICMP (ping)"
+        - action: allow
+          protocol: tcp
+          src_ip: 0.0.0.0/0
+          dst_port: 80
+          comment: "Allow HTTP"
+        - action: allow
+          protocol: tcp
+          src_ip: 0.0.0.0/0
+          dst_port: 443
+          comment: "Allow HTTPs"
