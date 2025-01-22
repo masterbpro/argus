@@ -63,11 +63,11 @@ build:
 	ln -sf /usr/src/linux-headers-5.15.0-130-generic/arch/x86/include/generated/uapi/asm/types.h /usr/include/asm/types.h
 
 	mkdir -p argus/bin/$(shell uname -m)/$(shell uname -r)
-	clang -O2 -g -target bpf -c argus/src/ddos.bpf.c -o argus/bin/$(shell uname -m)/$(shell uname -r)/ddos.bpf.o
+	clang -O2 -g -target bpf -c argus/src/ddos.bpf.c -o argus/target/$(shell uname -m)/$(shell uname -r)/ddos.bpf.o
 	gcc argus/main.c -o argus/main -lbpf
 
 upload:
-	argus/main argus/bin/$(shell uname -m)/$(shell uname -r)/ddos.bpf.o enp0s8
+	argus/main argus/target/$(shell uname -m)/$(shell uname -r)/ddos.bpf.o enp0s8
 
 list:
 	bpftool prog show
