@@ -11,6 +11,8 @@
 apt install make
 ```
 
+Bcc setup instruction: https://github.com/iovisor/bcc/blob/master/INSTALL.md
+
 ```shell
 make
 make build
@@ -19,6 +21,19 @@ make upload
 make list
 # get bpf values
 bpftool map dump id 1
+```
+
+### How to use
+
+#### Attaching program
+```shell
+cd argus/src
+python3 loader.py
+```
+
+#### Detaching program
+```shell
+bpftool net detach xdp dev [socket_name]
 ```
 
 ### DoS
