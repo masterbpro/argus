@@ -1,6 +1,5 @@
 struct packet_info {
     u64 count;
-    u64 last_ping;
     u64 ban_time;
 };
 
