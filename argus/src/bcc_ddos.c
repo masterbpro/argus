@@ -9,6 +9,7 @@ struct rate_limit_entry {
     u32 packet_count;
 };
 
+BPF_TABLE_PINNED("hash", u32, u64, ban_map, 1024, "/sys/fs/bpf/ban_map");
 BPF_TABLE_PINNED("hash" , u32, struct rate_limit_entry, rate_limit_map, 1024, "/sys/fs/bpf/rate_limit_map");
 
 int argus_count_packets(struct xdp_md *ctx) {
@@ -28,6 +29,8 @@ int argus_count_packets(struct xdp_md *ctx) {
         return XDP_PASS;
 
     u32 src_ip = iph->saddr;
+    if (ban_map.lookup(&src_ip))
+        return XDP_DROP;
 
     struct rate_limit_entry *entry = rate_limit_map.lookup(&src_ip);
     u64 current_time = bpf_ktime_get_ns();

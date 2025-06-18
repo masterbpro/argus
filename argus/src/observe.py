@@ -1,24 +1,18 @@
 from bcc import BPF
-from time import sleep
-import ctypes as ct
-import socket, struct
 import ipaddress
-from datetime import datetime
 import sys
 
 def get_ip_from_int(int_ip):
     ip = ipaddress.ip_address(int_ip)
     return ".".join(str(ip).split(".")[::-1])
 
-def display_table(bpf_object):
-    ip_map = bpf_object["ip_count_map"]
+def display_table(table):
     s = "\n===========\n"
-    s += "IP \t\t Count \t Ban time\n"
-
-    for key, value in ip_map.items():
+    s += "Banned IPs\n"
+    s = "===========\n"
+    for key in table.keys():
         ip_str = get_ip_from_int(key.value)
-        ban_time =  datetime.utcfromtimestamp(value.ban_time / 1e9)
-        s += f"{ip_str} \t {value.count} \t {ban_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        s += f"{ip_str}\n"
 
     s += "===========\n"
     print(s)
@@ -36,12 +30,24 @@ except Exception:
 
 match command:
     case "list":
-        display_table(b)    
+        display_table(b["ban_map"])    
     case "ban":
         try:
             arguments = sys.argv[2:]
         except Exception:
-            pass
+            print("Hint: python3 observe.py ban <ip>")
+            sys.exit()
+        for ip in arguments:
+            b["ban_map"].items_update_batch(arguments, [1 for _ in arguments])
+    case "unban":
+        try:
+            arguments = sys.argv[2:]
+        except Exception:
+            print("Hint: python3 observe.py unban <ip>")
+            sys.exit()
+        for ip in arguments:
+            b["ban_map"].items_delete_batch(arguments)
+    
     case _:
         pass
 
