@@ -4,6 +4,7 @@
 
 **Development environment:**
 
+- **Distributive**: `Debian 12 (bookworm)`
 - **Linux Kernel**: `5.15.0-130-generic`
 - **Architecture**: `x86_64 GNU/Linux`
 
