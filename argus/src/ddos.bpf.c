@@ -4,60 +4,55 @@
 #include <linux/ip.h>
 #include <stdint.h>
 
-#ifndef ETH_P_IP
-#define ETH_P_IP 0x0800
-#endif
+#define RATE 1000
+#define BURST 2000
+#define NSEC_PER_SEC 1000000000ULL
 
-static inline uint16_t bpf_htons(uint16_t val) {
-    return __builtin_bswap16(val);
-}
-
-struct packet_info {
-    uint64_t count;
-    uint64_t last_ping;
+struct token_bucket {
+    uint64_t tokens;
+    uint64_t last_ts;
 };
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 1024);
-    __type(key, uint8_t[4]);
-    __type(value, struct packet_info);
-} ip_count_map SEC(".maps");
+    __type(key, uint32_t);
+    __type(value, struct token_bucket);
+} buckets SEC(".maps");
 
 SEC("xdp")
-int argus_count_packets(struct xdp_md *ctx) {
-    void *data_end = (void *)(long)ctx->data_end;
-    void *data = (void *)(long)ctx->data;
+int argus_ddos(struct xdp_md *ctx) {
+    void *data_end = (void*)(long)ctx->data_end;
+    void *data = (void*)(long)ctx->data;
     struct ethhdr *eth = data;
+    uint64_t now = bpf_ktime_get_ns();
 
-    if ((void *)(eth + 1) > data_end) {
-        return XDP_PASS;
-    }
-    if (eth->h_proto != bpf_htons(ETH_P_IP)) {
-        return XDP_PASS;
+    if ((void*)(eth + 1) > data_end) return XDP_PASS;
+    if (eth->h_proto != __builtin_bswap16(ETH_P_IP)) return XDP_PASS;
+
+    struct iphdr *ip = (void*)(eth + 1);
+    if ((void*)(ip + 1) > data_end) return XDP_PASS;
+
+    uint32_t src = ip->saddr;
+    struct token_bucket *tb = bpf_map_lookup_elem(&buckets, &src);
+    if (!tb) {
+        struct token_bucket init = { .tokens = BURST, .last_ts = now };
+        bpf_map_update_elem(&buckets, &src, &init, BPF_ANY);
+        tb = bpf_map_lookup_elem(&buckets, &src);
+        if (!tb) return XDP_PASS;
     }
 
-    struct iphdr *ip = (void *)(eth + 1);
-    if ((void *)(ip + 1) > data_end) {
-        return XDP_PASS;
+    uint64_t delta = now - tb->last_ts;
+    uint64_t add = delta * RATE / NSEC_PER_SEC;
+    if (add) {
+        tb->tokens += add;
+        if (tb->tokens > BURST) tb->tokens = BURST;
+        tb->last_ts = now;
     }
 
-    uint8_t ip_key[4] = {
-        (ip->saddr >> 24) & 0xFF,
-        (ip->saddr >> 16) & 0xFF,
-        (ip->saddr >> 8) & 0xFF,
-        ip->saddr & 0xFF
-    };
-    struct packet_info *value = bpf_map_lookup_elem(&ip_count_map, ip_key);
-    if (value) {
-        value->count++;
-        value->last_ping = bpf_ktime_get_ns() / 1000000000;
-    } else {
-        struct packet_info new_value = {};
-        new_value.count = 1;
-        new_value.last_ping = bpf_ktime_get_ns() / 1000000000;
-        bpf_map_update_elem(&ip_count_map, ip_key, &new_value, BPF_ANY);
-    }
+    if (tb->tokens == 0)
+        return XDP_DROP;
+    tb->tokens--;
 
     return XDP_PASS;
 }

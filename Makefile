@@ -35,3 +35,14 @@ list:
 	@echo "Listing BPF objects/maps..."
 	bpftool prog show
 	bpftool map show
+
+uninstall:
+	@echo "Detaching XDP program from '$(IFACE)'..."
+	@LINK_ID=$$(bpftool link show | grep '/sys/fs/bpf/ddos_link' | cut -d: -f1); \
+	if [ -n "$$LINK_ID" ]; then \
+		bpftool link detach id $$LINK_ID; \
+	else \
+		echo "No active XDP link found."; \
+	fi
+	@echo "Removing pinned link..."
+	@rm -f /sys/fs/bpf/ddos_link
