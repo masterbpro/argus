@@ -1,50 +1,59 @@
-#include <bpf/libbpf.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <net/if.h>
+#include <bpf/libbpf.h>
+#include <bpf/bpf.h>
 
 int main(int argc, char **argv) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <BPF_PROGRAM_FILE> <INTERFACE_NAME>\n", argv[0]);
-        return 1;
-    }
-
-    const char *program_file = argv[1];
-    const char *interface_name = argv[2];
-
     struct bpf_object *obj;
-    int prog_fd;
+    struct bpf_program *prog = NULL;
+    struct bpf_link *link;
+    int ifindex;
 
-    obj = bpf_object__open_file(program_file, NULL);
-    if (!obj) {
-        perror("Error opening BPF object");
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s <bpf object> <ifname>\n", argv[0]);
         return 1;
     }
+
+    ifindex = if_nametoindex(argv[2]);
+    if (!ifindex) {
+        perror("if_nametoindex");
+        return 1;
+    }
+
+    obj = bpf_object__open_file(argv[1], NULL);
+    if (libbpf_get_error(obj)) {
+        fprintf(stderr, "Failed to open BPF object: %s\n", argv[1]);
+        return 1;
+    }
+
     if (bpf_object__load(obj)) {
-        perror("Error loading BPF object");
-        bpf_object__close(obj);
-        return 1;
-    }
-    prog_fd = bpf_program__fd(bpf_object__find_program_by_title(obj, "xdp"));
-    if (prog_fd < 0) {
-        perror("Error getting program file descriptor");
-        bpf_object__close(obj);
-        return 1;
-    }
-    int ifindex = if_nametoindex(interface_name);
-    if (ifindex == 0) {
-        perror("Error getting interface index");
-        bpf_object__close(obj);
-        return 1;
-    }
-    if (bpf_set_link_xdp_fd(ifindex, prog_fd, 0) < 0) {
-        perror("Error attaching program to interface");
+        fprintf(stderr, "Failed to load BPF object\n");
         bpf_object__close(obj);
         return 1;
     }
 
-    printf("BPF program successfully loaded and attached to %s\n", interface_name);
+    bpf_object__for_each_program(prog, obj) {
+        printf("Attaching program '%s'\n", bpf_program__name(prog));
+        break;
+    }
+    if (!prog) {
+        fprintf(stderr, "No BPF programs found in object\n");
+        bpf_object__close(obj);
+        return 1;
+    }
+
+    link = bpf_program__attach_xdp(prog, ifindex);
+    if (libbpf_get_error(link)) {
+        fprintf(stderr, "Failed to attach XDP program\n");
+        bpf_object__close(obj);
+        return 1;
+    }
+
+    system("mount -t bpf bpf /sys/fs/bpf 2>/dev/null || true");
+    bpf_link__pin(link, "/sys/fs/bpf/ddos_link");
+
     bpf_object__close(obj);
     return 0;
 }
