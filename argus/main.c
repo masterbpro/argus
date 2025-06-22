@@ -4,9 +4,11 @@
 #include <net/if.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include "src/parse.h"
 
 int main(int argc, char **argv) {
-    struct bpf_object *obj;
+   	
+	struct bpf_object *obj;
     struct bpf_program *prog = NULL;
     struct bpf_link *link;
     int ifindex;
@@ -50,9 +52,13 @@ int main(int argc, char **argv) {
         bpf_object__close(obj);
         return 1;
     }
-
-    system("mount -t bpf bpf /sys/fs/bpf 2>/dev/null || true");
-    bpf_link__pin(link, "/sys/fs/bpf/ddos_link");
+    struct bpf_map *blacklist = bpf_object__find_map_by_name(obj, "blacklist");
+    struct bpf_map *allowlist = bpf_object__find_map_by_name(obj, "allowlist");
+    
+	system("mount -t bpf bpf /sys/fs/bpf 2>/dev/null || true");
+	bpf_map__pin(blacklist, "/sys/fs/bpf/blacklist");	   	
+	bpf_map__pin(allowlist, "/sys/fs/bpf/allowlist");
+	bpf_link__pin(link, "/sys/fs/bpf/ddos_link");
 
     bpf_object__close(obj);
     return 0;

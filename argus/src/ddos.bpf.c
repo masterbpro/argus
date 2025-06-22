@@ -3,11 +3,12 @@
 #include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <stdint.h>
+#include <stdbool.h>
 
-#define RATE 1000
-#define BURST 2000
+#define RATE 100
+#define BURST 200
 #define NSEC_PER_SEC 1000000000ULL
-
+	
 struct token_bucket {
     uint64_t tokens;
     uint64_t last_ts;
@@ -20,12 +21,27 @@ struct {
     __type(value, struct token_bucket);
 } buckets SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__type(key, uint32_t);
+	__type(value, bool);
+} allowlist SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__type(key, uint32_t);
+	__type(value, bool);
+} blacklist SEC(".maps");
+
 SEC("xdp")
 int argus_ddos(struct xdp_md *ctx) {
     void *data_end = (void*)(long)ctx->data_end;
     void *data = (void*)(long)ctx->data;
     struct ethhdr *eth = data;
     uint64_t now = bpf_ktime_get_ns();
+	struct token_bucket *tb = NULL;
 
     if ((void*)(eth + 1) > data_end) return XDP_PASS;
     if (eth->h_proto != __builtin_bswap16(ETH_P_IP)) return XDP_PASS;
@@ -34,13 +50,17 @@ int argus_ddos(struct xdp_md *ctx) {
     if ((void*)(ip + 1) > data_end) return XDP_PASS;
 
     uint32_t src = ip->saddr;
-    struct token_bucket *tb = bpf_map_lookup_elem(&buckets, &src);
+    tb = bpf_map_lookup_elem(&blacklist, &src);
+    if (tb) return XDP_DROP;
+	tb = bpf_map_lookup_elem(&allowlist, &src);
+    if (tb) return XDP_PASS;
+	tb = bpf_map_lookup_elem(&buckets, &src);
     if (!tb) {
         struct token_bucket init = { .tokens = BURST, .last_ts = now };
         bpf_map_update_elem(&buckets, &src, &init, BPF_ANY);
         tb = bpf_map_lookup_elem(&buckets, &src);
-        if (!tb) return XDP_PASS;
-    }
+    	if (!tb) return XDP_PASS;
+	}
 
     uint64_t delta = now - tb->last_ts;
     uint64_t add = delta * RATE / NSEC_PER_SEC;

@@ -19,7 +19,8 @@ install_packages:
 	    linux-libc-dev \
 	    libc6-dev:i386 \
 	    gcc-multilib \
-	    bpftool
+	    bpftool \
+	    libyaml-dev 
 
 build:
 	@echo "Building eBPF program..."
