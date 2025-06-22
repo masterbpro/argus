@@ -11,7 +11,9 @@ int main(int argc, char **argv) {
 	struct bpf_object *obj;
     struct bpf_program *prog = NULL;
     struct bpf_link *link;
-    int ifindex;
+    Interface *interfaces = NULL;
+	int interfaces_count = 0;
+	int ifindex;
 
     if (argc < 3) {
         fprintf(stderr, "Usage: %s <bpf object> <ifname>\n", argv[0]);
@@ -59,6 +61,12 @@ int main(int argc, char **argv) {
 	bpf_map__pin(blacklist, "/sys/fs/bpf/blacklist");	   	
 	bpf_map__pin(allowlist, "/sys/fs/bpf/allowlist");
 	bpf_link__pin(link, "/sys/fs/bpf/ddos_link");
+	
+	parse_yaml("config.yaml", &interfaces, &interfaces_count);
+
+			
+
+
 
     bpf_object__close(obj);
     return 0;
