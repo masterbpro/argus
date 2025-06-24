@@ -56,18 +56,48 @@ int main(int argc, char **argv) {
     }
     struct bpf_map *blacklist = bpf_object__find_map_by_name(obj, "blacklist");
     struct bpf_map *allowlist = bpf_object__find_map_by_name(obj, "allowlist");
+    char blacklist_name[256], allowlist_name[256];
     
 	system("mount -t bpf bpf /sys/fs/bpf 2>/dev/null || true");
-	bpf_map__pin(blacklist, "/sys/fs/bpf/blacklist");	   	
-	bpf_map__pin(allowlist, "/sys/fs/bpf/allowlist");
+	snprintf(allowlist_name, sizeof(allowlist_name), "/sys/fs/bpf/%s_allowlist", argv[2]);
+    snprintf(blacklist_name, sizeof(blacklist_name), "/sys/fs/bpf/%s_blacklist", argv[2]);
+    if (!bpf_map__is_pinned(blacklist)) bpf_map__pin(blacklist, blacklist_name);	   	
+	if (!bpf_map__is_pinned(allowlist)) bpf_map__pin(allowlist, allowlist_name);
 	bpf_link__pin(link, "/sys/fs/bpf/ddos_link");
 	
-	parse_yaml("config.yaml", &interfaces, &interfaces_count);
+	if (parse_yaml("config.yaml", &interfaces, &interfaces_count))
+    {
+        fprintf(stderr, "Failed to parse config.yaml/n");
+        bpf_object__close(obj);
+        return 1;
+    }
+    struct bpf_map *cur_blacklist = NULL, *cur_allowlist = NULL;
 
-			
-
-
-
+    for (int i = 0; i < interfaces_count ; i++)
+    {
+        snprintf(blacklist_name, sizeof(blacklist_name), "/sys/fs/bpf/%s_blacklist", interfaces[i].name);
+        snprintf(allowlist_name, sizeof(blacklist_name), "/sys/fs/bpf/%s_allowlist", interfaces[i].name);
+        cur_blacklist = bpf_obj_get(blacklist_name);
+        cur_allowlist = bpf_obj_get(allowlist_name);
+        
+        if (cur_blacklist < 0) 
+            fprintf(stderr, "Error opening %s\n", blacklist_name);
+        if (cur_allowlist < 0) 
+            fprintf(stderr, "Error opening %s\n", allowlist_name);
+        
+        if (!cur_blacklist) fprintf(stderr, "Error while opening map %s\0", blacklist_name);
+        if (!cur_allowlist) fprintf(stderr, "Error while opening map %s\0", allowlist_name);
+        for (int j = 0; j < interfaces[i].blacklist_count; j++)
+        {
+            interfaces[i].blacklist[j].port = 0;
+            bpf_map__update_elem(cur_blacklist, &interfaces[i].blacklist[j], sizeof(Socket), true, sizeof(bool), BPF_ANY);
+        }
+        for (int j = 0; j < interfaces[i].allowlist_count; j++)
+        {
+            interfaces[i].allowlist[j].port = 0;
+            bpf_map__update_elem(cur_allowlist, &interfaces[i].allowlist[j], sizeof(Socket), true, sizeof(bool), BPF_ANY);
+        }
+    }
     bpf_object__close(obj);
     return 0;
 }

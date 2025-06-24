@@ -26,7 +26,7 @@ build:
 	@echo "Building eBPF program..."
 	mkdir -p argus/bin
 	clang -O2 -g -target bpf -c argus/src/ddos.bpf.c -o argus/bin/ddos.bpf.o
-	gcc argus/main.c -o argus/main -lbpf
+	gcc argus/main.c argus/src/parse.c -o argus/main -lbpf -lyaml -lelf -lz
 
 upload:
 	@echo "Uploading eBPF program to interface '$(IFACE)'..."

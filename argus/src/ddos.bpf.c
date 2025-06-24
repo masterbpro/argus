@@ -4,7 +4,6 @@
 #include <linux/ip.h>
 #include <stdint.h>
 #include <stdbool.h>
-
 #define RATE 100
 #define BURST 200
 #define NSEC_PER_SEC 1000000000ULL
@@ -13,6 +12,11 @@ struct token_bucket {
     uint64_t tokens;
     uint64_t last_ts;
 };
+
+typedef struct {
+    uint32_t ip;
+    int port;
+} Socket;
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
@@ -24,14 +28,14 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 1024);
-	__type(key, uint32_t);
+	__type(key, Socket);
 	__type(value, bool);
 } allowlist SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 1024);
-	__type(key, uint32_t);
+	__type(key, Socket);
 	__type(value, bool);
 } blacklist SEC(".maps");
 
@@ -50,9 +54,10 @@ int argus_ddos(struct xdp_md *ctx) {
     if ((void*)(ip + 1) > data_end) return XDP_PASS;
 
     uint32_t src = ip->saddr;
-    tb = bpf_map_lookup_elem(&blacklist, &src);
+    Socket sock = { src, 0};
+    tb = bpf_map_lookup_elem(&blacklist, &sock);
     if (tb) return XDP_DROP;
-	tb = bpf_map_lookup_elem(&allowlist, &src);
+	tb = bpf_map_lookup_elem(&allowlist, &sock);
     if (tb) return XDP_PASS;
 	tb = bpf_map_lookup_elem(&buckets, &src);
     if (!tb) {

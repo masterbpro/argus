@@ -116,7 +116,7 @@ int parse_yaml(const char *filename, Interface **interfaces, int *interface_coun
                             current_interface = count - 1;
                         } 
                         else if (current_socket && strcmp(current_key, "ip") == 0) {
-                            current_socket->ip = strdup(value);
+                            current_socket->ip = (uint32_t)atoi(value);
                         }
                         else if (current_socket && strcmp(current_key, "port") == 0) {
                             current_socket->port = atoi(value);

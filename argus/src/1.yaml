@@ -1,0 +1,19 @@
+interfaces:
+  - name: lo
+    blacklist: [ ]
+    allowlist:
+      - ip: 0.0.0.0/0
+        port: 0
+
+  - name: eth0
+    blacklist:
+      - ip: 0.0.0.0/0
+        port: 0
+    allowlist:
+      - ip: 159.69.16.47/32
+        port: 22
+      - ip: 0.0.0.0/0
+        port: 80
+      - ip: 0.0.0.0/0
+        port: 443
+

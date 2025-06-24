@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 typedef struct {
-    char *ip;
+    uint32_t ip;
     int port;
 } Socket;
 
